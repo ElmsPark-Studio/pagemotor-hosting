@@ -1,5 +1,9 @@
 # PageMotor Hosting Guide
 
+> **Canonical home:** [documentation.elmspark.com/hosting/vultr/](https://documentation.elmspark.com/hosting/vultr/)
+>
+> This repository is a mirror. The canonical version with full styling, sidebar navigation, search, and dark mode lives at the link above.
+
 A practical guide to running PageMotor on a VPS. Benchmarks, pricing comparisons, and the exact bootstrap we use to get PageMotor 0.8.2b live on a fresh box in about 30 minutes.
 
 Published by [ElmsPark Studio](https://elmspark.com). Updated April 2026.
