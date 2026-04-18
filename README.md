@@ -14,7 +14,10 @@ Published by [ElmsPark Studio](https://elmspark.com). Updated April 2026.
 - [Pick a plan for your size](#pick-a-plan-for-your-size)
 - [Which region to pick](#which-region-to-pick)
 - [What to tick on the Vultr signup screen](#what-to-tick-on-the-vultr-signup-screen)
-- [From empty box to live PageMotor](#from-empty-box-to-live-pagemotor)
+- [Let Claude Code do the heavy lifting](#let-claude-code-do-the-heavy-lifting)
+- [7 manual steps before Claude Code takes over](#before-claude-code-takes-over-7-manual-steps)
+- [The prompt to paste](#the-prompt-copy-paste-edit-three-lines)
+- [From empty box to live PageMotor](#from-empty-box-to-live-pagemotor-what-claude-code-does-under-the-hood)
 - [Settings people forget](#settings-people-forget-and-later-regret)
 - [The cost side](#the-cost-side)
 - [Summary](#summary)
@@ -151,9 +154,147 @@ Generate an ed25519 key on your Mac with `ssh-keygen -t ed25519` if you do not a
 
 ---
 
-## From empty box to live PageMotor
+## Let Claude Code do the heavy lifting
 
-About 30 minutes start to finish.
+If "bash commands" and "edit the Nginx vhost" made your eyes glaze over, you are the reason this section exists. [Claude Code](https://claude.com/claude-code) is a command-line tool from Anthropic that will SSH into your Vultr box, run every command in this guide, and explain each step in plain English as it goes.
+
+You do not need to understand what any of the commands do. You need to understand what you want: PageMotor 0.8.2b running at your domain, with SSL, on a fresh Vultr box. Tell Claude Code that, and it handles the rest.
+
+### What Claude Code does for you
+
+- Runs every `apt install`, config edit, `chmod` and `systemctl` command
+- Shows you each command before running it, so you can watch it happen
+- Checks the output of each step, stops on errors, asks before retrying
+- Reads this guide as the reference, so the box matches what is documented
+- Never deletes anything without asking first
+- Uses British English and plain language when talking to you
+
+### What Claude Code will NOT do automatically
+
+- Create your Vultr account (you sign up as a human)
+- Provision the VPS (you click through Vultr's signup screen)
+- Point DNS at the new VPS IP (you edit your domain's DNS)
+- Create your admin account (you register at `/admin/` on first visit)
+- Install EP plugins (ask Claude Code afterwards as a separate step)
+
+Those five things cross a human-authorisation line: money, identity, DNS ownership, admin rights. The rest, Claude Code does.
+
+---
+
+## Before Claude Code takes over: 7 manual steps
+
+These are the things you do by hand first. Each is a one-time thing. After step 7, paste the prompt in the next section and Claude Code handles everything else.
+
+**1. Buy a domain if you do not already have one.** Any registrar works (Namecheap, Cloudflare, GoDaddy, Porkbun). You need to be able to edit the DNS A record, which every registrar supports.
+
+**2. Install Claude Code on your Mac.** Download from [claude.com/claude-code](https://claude.com/claude-code). Free to install. You pay only for Anthropic API usage, which for this setup costs a few pence at most.
+
+**3. Generate an SSH key on your Mac, one time ever.** Open Terminal and run:
+
+```bash
+ssh-keygen -t ed25519
+```
+
+Press Enter three times to accept the defaults. Your public key is now at `~/.ssh/id_ed25519.pub`. If you already did this years ago, skip to step 4.
+
+**4. Sign up for Vultr and provision the VPS.** Go to [vultr.com](https://www.vultr.com/), sign up, then provision a VPS using the choices in "What to tick on the Vultr signup screen" above. Paste your SSH public key from step 3 into the SSH Keys field during signup. This is the most important security click on the page.
+
+To copy your public key to the clipboard:
+
+```bash
+cat ~/.ssh/id_ed25519.pub | pbcopy
+```
+
+Then paste into Vultr's SSH Keys field.
+
+**5. Note the VPS IP address.** Once the VPS finishes provisioning (30 to 60 seconds), Vultr's dashboard shows the public IP. Copy it. You need it for step 6 and for the prompt.
+
+**6. Point your domain's A record at the VPS IP.** Log in to your registrar (or Cloudflare if you use it for DNS). Edit the A record for your root domain to point at the VPS IP from step 5. Propagation takes anywhere from a few minutes to an hour.
+
+Quick check it worked: `dig yoursite.com +short` in Terminal should return the VPS IP.
+
+**7. Download the PageMotor 0.8.2b core files.** Grab the official PageMotor 0.8.2b core ZIP from the forum download area and unzip it somewhere easy to find, like `~/Downloads/pagemotor-0.8.2b/`. Note the path. You need it in the prompt.
+
+The folder should contain `pagemotor.php`, `index.php`, `lib/`, `config-sample.php` and `license.txt`.
+
+---
+
+## The prompt (copy, paste, edit three lines)
+
+Open Claude Code in Terminal, paste the prompt below, edit the three bracketed placeholders to match your setup, then hit Enter and watch it run.
+
+```
+I have a fresh Ubuntu 24.04 VPS at [VPS_IP_FROM_VULTR].
+I can SSH as root using my ed25519 key at ~/.ssh/id_ed25519.
+
+My domain is [yoursite.com]. The A record already points at the VPS IP.
+
+My PageMotor 0.8.2b core files are in [~/Downloads/pagemotor-0.8.2b/].
+The folder contains pagemotor.php, index.php, lib/, config-sample.php, license.txt.
+
+Please follow the "From empty box to live PageMotor" procedure at
+https://github.com/ElmsPark-Studio/pagemotor-hosting
+
+Do this end-to-end:
+1. Bootstrap the server (nginx, PHP 8.3 FPM with required extensions,
+   MariaDB, certbot, fail2ban, UFW allowing only 22/80/443)
+2. Configure MariaDB to default to utf8mb4
+3. Create the database and a dedicated DB user scoped to it
+4. Upload my PageMotor 0.8.2b core to /var/www/mysite on the VPS,
+   create user-content subfolders, set ownership to www-data
+5. Write config.php with my database credentials and the four
+   required constants
+6. Create the Nginx vhost with fastcgi_read_timeout 600,
+   client_max_body_size 64M, and the /lib/ php denial rule
+7. Set PHP max_execution_time to 300 and memory_limit to 256M
+8. Run certbot --nginx for SSL
+9. Verify the Nginx config is valid and services are running
+10. Hit the homepage once with curl to trigger the PageMotor seeder
+    (creates tables)
+11. Confirm the tables exist in the database
+
+Stop after step 11. Do NOT register an admin account. Do NOT install
+EP plugins. I will register via /admin/ in a browser, then ask you to
+install plugins as a separate next task.
+
+Rules:
+- Tell me what you are about to do before doing it
+- Show me the output of each step
+- Stop on any error and ask me before continuing
+- British English (organise, behaviour, colour)
+- No em dashes in any file you write. Use commas or full stops.
+- Ask before anything destructive
+```
+
+**What to edit:**
+
+1. `[VPS_IP_FROM_VULTR]` with your VPS IP (eg `149.28.47.148`)
+2. `[yoursite.com]` with your actual domain (appears twice)
+3. `[~/Downloads/pagemotor-0.8.2b/]` with the actual path where you unzipped the core
+
+### After the prompt finishes
+
+Claude Code stops at step 11 and tells you the site is ready to register. Now the manual bit:
+
+1. Open `https://yoursite.com/admin/` in your browser
+2. Register your first account. Whoever registers first becomes the administrator.
+3. Come back to Claude Code and say:
+
+```
+Please install EP Email, EP Newsletter, EP Newsletter SendGrid, EP GDPR,
+EP Password Reset and EP Diagnostics on yoursite.com. Then configure
+EP Email with SendGrid SMTP using my API key [SG.xxx].
+```
+
+**One thing the prompt does not cover yet:** SMTP configuration. Once the plugins are in, you will need a SendGrid API key (free tier is fine) and a verified sender domain. That is another short conversation with Claude Code, not a separate guide.
+
+---
+
+## From empty box to live PageMotor (what Claude Code does under the hood)
+
+If you are using the Claude Code prompt above, you can skip this section. It documents the exact sequence Claude Code runs for you, kept here for transparency and for anyone who prefers to do it by hand.
+
+About 30 minutes start to finish if done manually.
 
 ### 1. Bootstrap the server
 
